@@ -9,9 +9,7 @@ typedef pair<int, int> ii;
 typedef pair<double, ii> fii;
 typedef pair<double, int> fi;
 
-// void gen_init_sol ();
-// void input ();
-// void init ();
+#define maxn 50111
 
 struct Point;
 struct GenSol;
@@ -34,6 +32,7 @@ vector<fii> e_list;
 vector<vector<fi> > adj_list;
 
 int seq[50111];
+int seq_tmp[maxn]; // For reversing array
 int ans[50111]; 
 double cost_ans;
 // priority_queue < fii, vector <fii>, greater <fii> >  e_inSeq;
@@ -88,7 +87,7 @@ struct GenSol{
 		// e_inSeq.clear ();
 		tmp.assign (n, vector<int> ());
 		double cost = 0;
-		cerr << "here come the shit" << endl;
+		// cerr << "here come the shit" << endl;
 		for (fii e : e_list){
 			int u = e.se.fi, v = e.se.se;
 			if (sameG (u, v) || tmp[u].size () > 1 || tmp[v].size () > 1) continue;
@@ -131,7 +130,7 @@ struct GenSol{
 	}
 
 	double gen_dfs_minE (){
-		cerr << "oh the shit 2" << endl;
+		// cerr << "oh the shit 2" << endl;
 		int s = rand () % n, id = 0;
 		inSeq.assign (n, 0);
 		double cost = 0;
@@ -253,8 +252,6 @@ void init (){
 				double d = p[i].dist(p[j]);
 				if (d > rad) continue;
 				e_list.push_back (fii (d, ii (i, j)));
-				// adj_list[i].push_back (fi (d, j));
-				// adj_list[j].push_back (fi (d, i));
 			}
 		}
 		sort (p, p + n, cmp2);
@@ -266,16 +263,8 @@ void init (){
 				double d = p[i].dist(p[j]);
 				if (d > rad) continue;
 				e_list.push_back (fii (d, ii (i, j)));
-				// adj_list[i].push_back (fi (d, j));
-				// adj_list[j].push_back (fi (d, i));
 			}
 		}
-		// cerr << "finish the init" << endl;
-		// for (int i = 0; i < n; i++){
-		// 	sort (adj_list[i].begin (), adj_list[i].end ()); 
-		// }
-		// cerr << "Oh " << e_list.size () <<  endl;
-		// sort (e_list.begin (), e_list.end ());
 	}
 }
 
@@ -298,7 +287,7 @@ double _2_opt (){
 	for (int i = 0; i < n; i++){
 		int u = seq[(s + i) % n], u1 = seq[(s + i + 1) % n];
 
-		double best_change = 1;
+		double best_change = 1000000000;
 		int swap_post;
 
 		for (int j = i + 2; j < n; j++){
@@ -314,25 +303,70 @@ double _2_opt (){
 		}
 
 		if (best_change < 0){
-			// cerr << best_change << endl;
-			// for (int j = i + 1; j <= swap_post;j ++)
-			// 	cerr << seq[j] << ' ';
-			// cerr << endl;
 			for (int j = i + 1; j <= swap_post; j++)
 				ans[(s + j) % n] = seq[(s + swap_post - j + i + 1) % n];
 			for (int j = i + 1; j <= swap_post; j++)
 				seq[(s + j) % n] = ans[(s + j) % n];
-			// for (int j = i + 1; j <= swap_post;j ++)
-			// 	cerr << seq[j] << ' ';
-			// cerr << endl;
 			cost += best_change;
 		}
-		// cerr << best_change << endl;
 		
 	}
-	// cerr << compute_cost () << endl;
-	// cerr << cost << endl;
 	
+	return cost;
+}
+
+
+
+double simulated_annealing (){
+	re_apply_ans ();
+	double cost = cost_ans, Temp = 150, best_cost = cost_ans;
+	double alpha = 0.999999;
+	int max_iter = 150000000;
+	while (max_iter--){
+		int s = rand () % n, i = rand () % (n - 2), j = i + 2 +  rand () % (n - i - 2);
+		int u = seq[(s + i) % n], u1 = seq[(s + i + 1) % n];
+		int v = seq[(s + j) % n], v1 = seq[(s + j + 1) % n];
+
+		double cur_cost = adj_mat[u][u1] + adj_mat[v][v1];
+		double new_cost = adj_mat[u][v] + adj_mat [u1][v1];
+		double change = new_cost - cur_cost;
+
+		// if (max_iter % 1000) cerr << change << ' ' << Temp << endl;
+
+		if (change < 0){
+			for (int k = i + 1; k <= j; k++){
+				seq_tmp [(s + k) % n] = seq [(s + j - k + i + 1) % n];
+			}
+			for (int k = i + 1; k <= j; k++){
+				seq[(s + k) % n] = seq_tmp[(s + k) % n];
+			}
+			cost += change;
+			Temp = Temp * alpha;
+		}
+		else {
+			double accept_prob = exp (1.0 * -change / Temp);
+			double prob = 1.0 * rand () / RAND_MAX;
+			// if (max_iter % 100000 == 0) cerr << accept_prob << endl;
+			if (prob <= accept_prob){
+				for (int k = i + 1; k <= j; k++){
+					seq_tmp [(s + k) % n] = seq [(s + j - k + i + 1) % n];
+				}
+				for (int k = i + 1; k <= j; k++){
+					seq[(s + k) % n] = seq_tmp[(s + k) % n];
+				}
+				cost += change;
+			}
+		}
+
+		if (cost < best_cost){
+			// cerr << "ohhhh" << endl;
+			best_cost = cost;
+			for (int i = 0; i < n; i++){
+				ans[i] = seq[i];
+			}
+		}
+	}
+
 	return cost;
 }
 
@@ -362,6 +396,7 @@ void process (){
 		for (int iter = 0; iter < _2_opt_max_iter; iter++){
 			cost_ans = _2_opt ();
 		}
+		simulated_annealing ();
 	}
 	
 	cout << compute_cost () << ' ' << 0 << endl;
