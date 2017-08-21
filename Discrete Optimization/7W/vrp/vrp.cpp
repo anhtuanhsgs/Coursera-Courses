@@ -139,7 +139,7 @@ void distance_greedy_sol (){
 		}
 		// cerr << best_cus->index << ' ' << mcost << endl;
 		if (mcost == oo){
-			cerr << "Fuk!!!! " << tmp << endl;  
+			// cerr << "Fuk!!!! " << tmp << endl;  
 		}
 		else{
 			best_cus->r = best_pos->r;
@@ -155,12 +155,12 @@ void distance_greedy_sol (){
 	}
 
 	// double cc = 0;
-	// for (int i = 1; i < n; i++){
-	// 	if (!picked[i]) cerr << "Fuk " << i << endl;
-	// }
-	// for (int i = 0; i < m; i++){
-	// 	cerr << rou[i].cap << endl;
-	// }
+	for (int i = 1; i < n; i++){
+		if (!picked[i]) cerr << "Fukkk " << i << endl;
+	}
+	for (int i = 0; i < m; i++){
+		cerr << rou[i].cap << endl;
+	}
 	// cerr << cc;
 }
 
@@ -169,7 +169,7 @@ void print_sol (){
 	for (int i = 0; i < m; i++)
 		total_cost += rou[i].cost;
 
-	cout << total_cost << endl;
+	cout << total_cost << ' ' << 0 << endl;
 
 	for (int i = 0; i < m; i++){
 		Customer *cur = rou[i].start;
