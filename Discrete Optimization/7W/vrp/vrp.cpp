@@ -45,6 +45,8 @@ struct Customer {
 	}
 
 	double insert (Customer *other);
+	double swap (Customer *l, Customer* r, int sum_cap);
+	double calculate_swap (Customer *l, Customer* r, int sum_cap);
 };
 
 struct Route {
@@ -77,6 +79,7 @@ ostream& operator << (ostream& os, const Customer& c){
 vector <Customer*> cus;
 vector <Route> rou;
 
+// insert a customer after this customer
 double Customer::insert(Customer *other){
 	{
 
@@ -92,6 +95,7 @@ double Customer::insert(Customer *other){
 			rou[other->picked].cost -= other->cost ();
 		}
 		rou[this->picked].cost -= dist[index][r->index];
+		this->r->l = other;
 		other->r = this->r;
 		other->l = this;
 		this->r = other;
@@ -105,11 +109,63 @@ double Customer::insert(Customer *other){
 	}
 }
 
+
+// swap this customer with a sequence of customer in another car
+// currently wrong changing cost
+double Customer::swap (Customer* L, Customer* R, int sum_cap){
+
+	double old_cost = this->cost () + dist [L->index][L->l->index] + dist[R->index][R->r->index];
+	double new_cost = 0;
+
+	// cerr << this->l->index << ' ' << this->r->index << endl;
+
+	L->l->r = this;
+	R->r->l = this;
+	this->l->r = L;
+	this->r->l = R;
+
+	rou[L->picked].cap += this->demand - sum_cap;
+	rou[L->picked].cost -= (dist [L->index][L->l->index] + dist[R->index][R->r->index]);
+	rou[this->picked].cap += sum_cap - this->demand;
+	rou[this->picked].cost -= this->cost ();
+
+	Customer *tmp_l = this->l, *tmp_r = this->r;
+	// cerr << tmp_l->index << ' ' << tmp_r->index << endl;
+
+	this->l = L->l;
+	this->r = R->r;
+
+	L->l = tmp_l;
+	R->r = tmp_r;
+
+	// cerr << "dfasdf " << L->l->index << ' ' << R->r->index << endl;
+
+	std::swap (this->picked, L->picked);
+
+	rou[this->picked].cost += this->cost ();
+	rou[L->picked].cost += dist[L->index][L->l->index] + dist[R->index][R->r->index];
+	new_cost += this->cost () + dist [L->index][L->l->index] + dist[R->index][R->r->index];
+	int tmp_picked = L->picked;
+	while (L != R->r){
+		L->picked = tmp_picked;
+		L = L->r;
+	}
+
+	return new_cost - old_cost;
+}
+
+// change in cost after swap
+double Customer::calculate_swap (Customer* L, Customer* R, int sum_cap){
+	double old_cost = this->cost () + dist [L->index][L->l->index] + dist[R->index][R->r->index];
+	double new_cost = dist [this->index][L->l->index] + dist[this->index][R->r->index];
+	new_cost += dist[this->l->index][L->index] + dist[this->r->index][R->index];
+	return new_cost - old_cost;
+}
+
 int main (){
 	input ();
 	init ();
 	process ();
-
 	print_sol ();
 }
 
@@ -146,6 +202,12 @@ void init (){
 void process (){
 	distance_greedy_sol ();
 	fix_failure ();
+	// int tmp = 0;
+	// for (int i = 0; i < m; i++){
+	// 	tmp += rou[i].cap;
+	// 	cerr << "asdfas " << rou[i].cap << endl;
+	// }
+	// cerr << "sum " << tmp << ' ' << 200 * (m) << endl;
 }
 
 void distance_greedy_sol (){
@@ -189,14 +251,13 @@ void distance_greedy_sol (){
 	// for (int i = 1; i < n; i++){
 	// 	if (cus[i]->picked < 0) cerr << "Fukkk " << i << endl;
 	// }
-	// for (int i = 0; i < m; i++){
-	// 	cerr << rou[i].cap << endl;
-	// }
+	
 	// cerr << cc;
 }
 
 void fix_failure (){
 	// Overload
+	int overload = 0;
 	for (int i = 1; i < n; i++){
 		if (cus[i]->picked < 0){
 			double mcost = oo;
@@ -213,11 +274,67 @@ void fix_failure (){
 			}
 
 			best_pos->insert (cus[i]);
+			overload += max (0.0, rou[best_pos->picked].cap - capacity);
 		}
 	}
 
+
+	// print_sol ();
+	// cerr << cus[20]->r->index << endl;
+	// cerr << cus[5]->l->index << ' ' << cus[5]->r->index << endl;	
+
 	// Fix overload
-	
+	int iter = 1000;
+	while (overload != 0){
+		Customer* best_cus, *bL, *bR;
+		double best_cost_change = oo, overload_change = 0, tmp_sum_cap = 0;
+		for (int i = 0; i < m; i++){
+			// cerr << i << endl;
+			if (rou[i].cap > capacity){
+
+				Customer *cus_i = rou[i].start->r;
+				while (cus_i != rou[i].end){
+					// cerr << cus_i->index << ' ' << cus_i->r->index << endl;
+					for (int c = 1; c < n; c++){
+						if (cus[c]->picked != i){
+							int j = cus[c]->picked;
+							Customer *L = cus[c];
+							Customer *R = L;
+							int sum_cap = L->demand;
+							int d_overload = max (0., rou[j].cap + cus_i->demand - sum_cap - capacity);
+							d_overload += max (0., rou[i].cap - cus_i->demand + sum_cap - capacity);
+							d_overload = d_overload - ((rou[i].cap - capacity) + max (0., rou[L->picked].cap - capacity));
+
+							// d_overload = - ((rou[i].cap - capacity) + max (0., rou[j].cap - capacity));
+
+							if (d_overload < 0){
+								if (best_cost_change > cus_i->calculate_swap (L, R, sum_cap)){
+									best_cost_change = cus_i->calculate_swap (L, R, sum_cap);
+									tmp_sum_cap = sum_cap;
+									best_cus = cus_i;
+									bL = L;
+									bR = R;
+									overload_change = d_overload;
+								}
+							}
+						}	
+					}
+					cus_i = cus_i->r;
+				}
+				
+			}
+		}
+
+		if (best_cost_change != oo){
+			// cerr << overload << endl;
+			// cerr << overload_change << ' ' << bL->index << ' ' << bR->index << ' ' << best_cus->index << endl;
+			best_cus->swap (bL, bR, tmp_sum_cap);
+			overload += overload_change;
+		}
+		else {
+			cerr << "Fuk";
+		}
+	}
 }
 
 void print_sol (){
